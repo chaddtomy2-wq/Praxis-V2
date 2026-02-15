@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Praxis</title>
+  <meta name="theme-color" content="#0B0D12" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <style>
+    html, body, #root { margin: 0; padding: 0; min-height: 100vh; background: #0B0D12; }
+  </style>
+
+  <!-- Firebase (compat/UMD) -->
+  <script src="https://www.gstatic.com/firebasejs/11.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore-compat.js"></script>
+
+  <!-- React (UMD) + Babel -->
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+// ─── Version Constants ────────────────────────────────────
+const APP_NAME = "Praxis";
+const APP_VERSION = "V1";
+const BUILD_DATE = "2026-02-15";
+const SCHEMA_VERSION = 1;
+
+// ─── React globals ─────────────────────────────────────
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── Firebase Config ──────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyCAN5KJSiq775mBqZffq6TvDwYVpe98Xsk",
+  authDomain: "praxis-v2.firebaseapp.com",
+  projectId: "praxis-v2",
+  storageBucket: "praxis-v2.firebasestorage.app",
+  messagingSenderId: "822050587129",
+  appId: "1:822050587129:web:f6b9802a491d3136ce7d28",
+};
+firebase.initializeApp(firebaseConfig);
+const fbAuth = firebase.auth();
+const fbDb = firebase.firestore();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+// ─── PRAXIS SEED DATA ────────────────────────────────────
+
+const ENTRIES = [
+  { id: 1, title: "Train Your Mind Like Your Body", pillar: "Mental Discipline", content: "Placebo is considered one of the most impactful effects in pharmacology.\n\nIn other words, the human mind is powerful enough to change your biology.\n\nThe mind doesn't just interpret reality — it helps create it.\n\nTrain and hone your thoughts like you train your body." },
+  { id: 2, title: "The Narrative Layer Creates Suffering", pillar: "Perception", content: "One of the most transformative perspective shifts is learning to distinguish between what happens to you and the story you tell yourself about what happens to you.\n\nMost suffering doesn't come from events themselves, but from the narrative layer we wrap around them — the assumptions about what it means, what it says about us, and what will happen next.\n\nYour first interpretation is often just your most practiced one, not your most accurate one.\n\nThere is a space between stimulus and response. That space is where freedom lives. Most people never notice it exists.\n\nWhen you catch yourself storytelling — \"I notice I'm telling myself this means X\" — you regain power over your emotional life. You stop being a passive recipient of reactions and become someone who chooses how to engage with difficulty." },
+  { id: 3, title: "State → Story → Action → Life", pillar: "Perception", content: "The state you're in dictates the story you tell yourself.\n\nThe story you tell yourself dictates the action you take.\n\nThe actions you take dictate the life you live." },
+  { id: 4, title: "The Subconscious Cannot Tell Pretend From Real", pillar: "Identity", content: "The subconscious mind cannot understand sarcasm or irony. It does not know the difference between an imagined event and a real memory.\n\nActors, fully aware they are performing, still fall victim to this effect.\n\nJames Gandolfini once said that playing Tony Soprano for years \"left seeds of Tony inside him.\"\n\nThe subconscious cannot tell when you are playing pretend.\n\nRepeatedly acting as something will slowly wire it into existence." },
+  { id: 5, title: "Collapse the Gap Between Decision and Action", pillar: "Mental Discipline", content: "The distance between deciding and doing is one of the most reliable predictors of whether your life will be extraordinary or ordinary.\n\nNot talent. Not circumstances. Not even the quality of your decisions — but how quickly you collapse the space between intention and execution.\n\nWhen you move from \"I should do this\" to physically doing it within hours instead of weeks, you operate differently.\n\nSuccess isn't about outcomes — it's about iteration speed.\n\nThe faster your decisions meet reality, the faster you receive feedback. The brutal honesty of immediate feedback separates extraordinary results from extraordinary intentions." },
+  { id: 6, title: "The Solomon Paradox — We Are Wiser For Others", pillar: "Cognitive Biases", content: "We often possess wisdom we cannot access when we need it most.\n\nWhen advising others, we see patterns clearly. We offer balanced, compassionate insight that acknowledges complexity without drowning in it.\n\nYet when facing our own decisions, we become immersed, reactive, and narrow in perspective.\n\nThe paradox is not that we lack wisdom — it's that we lack distance.\n\nPerspective, not intelligence, is often the difference between foolishness and insight." },
+  { id: 7, title: "Meditation Resets Your Baseline", pillar: "Mindfulness", content: "Meditation is not a dramatic breakthrough. It is the gradual rewiring of your relationship with your own mind.\n\nMost people are swept away by an endless internal monologue. Meditation creates distance from thought.\n\nOver months and years, this changes your emotional baseline.\n\nInstead of being consumed by resistance and commentary, you learn to meet experience directly.\n\nWhat you resist persists. What you observe transforms." },
+  { id: 8, title: "Stop Fighting Reality", pillar: "Mindfulness", content: "The exhausting war between what is and what you think should be is the fundamental human struggle.\n\nYou cannot work against reality because you are not separate from it.\n\nThe world includes your resistance. When you fight reality, reality wins.\n\nPower lies not in opposing what is happening, but in choosing how you meet it.\n\nWhat you resist persists. What you meet with awareness transforms." },
+  { id: 9, title: "Identity Is Built Through Repetition", pillar: "Identity", content: "Identity is not what you believe about yourself — it is what your nervous system has learned through repetition.\n\nYou do not become disciplined by deciding to be disciplined. You become disciplined by behaving that way until the pattern becomes automatic.\n\nAround 50–70 days of consistent behavior begins to feel natural.\n\nThe basal ganglia absorbs repetition and turns conscious effort into automatic action.\n\nYou become the person you repeatedly act as." },
+  { id: 10, title: "Never Let Illness Become Your Identity", pillar: "Identity", content: "Guard your mind viciously.\n\nIt is a catastrophic mistake to curse your own identity in any way.\n\nNever allow illness, struggle, or suffering to become who you are.\n\nEven in the face of difficulty, dignity remains.\n\nYou may experience symptoms. You may feel weakness.\n\nBut you are not the illness." },
+  { id: 11, title: "Live One Day At A Time", pillar: "Resilience", content: "Anyone can carry their burden, however hard, until nightfall.\n\nAnyone can do their work, however hard, for one day.\n\nAnyone can live patiently and purely until the sun goes down.\n\nAnd this is all life really means." },
+  { id: 12, title: "Success Is the Failures You Avoid", pillar: "Wealth & Power", content: "Success is largely the failures you avoid.\n\nHealth is the injuries you don't sustain.\nWealth is the purchases you don't make.\nHappiness is the objects you don't desire.\nPeace of mind is the arguments you don't engage.\n\nAvoid the bad to protect the good." },
+  { id: 13, title: "Nearly Everything Takes Longer Than You Think", pillar: "Resilience", content: "Nearly everything worthwhile takes longer than you expect.\n\nStart anyway.\nStop obsessing over the clock." },
+  { id: 14, title: "You Can Be Uncertain and Still Move Forward", pillar: "Mental Discipline", content: "You are allowed to be uncertain and still move forward." },
+  { id: 15, title: "Use What Is Instead of Complaining About What Should Be", pillar: "Leadership", content: "Some people see what should be and complain when they don't get their due.\n\nOthers see what is — and figure out how to use it to their advantage." },
+  { id: 16, title: "You Don't Have to Drink the Rain", pillar: "Mindfulness", content: "When water falls on you like rain, it evaporates.\n\nThoughts are the same.\n\nYou may feel fear, anger, sadness — but you don't have to absorb them.\n\nLet the thought pass the way rain dries in the sun.\n\nYou can experience a feeling without claiming it as identity." },
+  { id: 17, title: "The Mind Makes Heaven or Hell", pillar: "Perception", content: "The mind itself is a place, and in itself can make a heaven of hell, or a hell of heaven." },
+  { id: 18, title: "Curiosity Is the Foundation of Virtue", pillar: "Identity", content: "Curiosity is the foundation of all virtues." },
+  { id: 19, title: "Attention Shapes Reality", pillar: "Perception", content: "Perception, attention, and reality are three sides of the same crucible.\n\nChange one and you change the others.\n\nYour reality is shaped by what you attend to." },
+  { id: 20, title: "Unhappiness Comes From Wanting What You Don't Have", pillar: "Mindfulness", content: "If you are unhappy, think about what you desire that you don't have." },
+  { id: 21, title: "Achievements Do Not Create Happiness", pillar: "Perception", content: "If past achievements didn't make you meaningfully happier, future achievements won't either.\n\nYou are roughly as happy as you decide to be today.\n\nLong-term happiness doesn't arrive when you achieve something.\n\nIt arrives when you decide to be happy — even after you achieve it." },
+  { id: 22, title: "Laziness Is Focusing on Effort Instead of Outcome", pillar: "Mental Discipline", content: "Laziness is the habit of thinking about the effort rather than the outcome." },
+  { id: 23, title: "Discipline Makes Today Harder and Tomorrow Easier", pillar: "Mental Discipline", content: "Excuses make today easier and tomorrow harder.\n\nDiscipline makes today harder and tomorrow easier." },
+  { id: 24, title: "Action Is What Changes You", pillar: "Mental Discipline", content: "Thoughts don't change the world.\n\nAction does.\n\nAction changes your environment.\nAction changes your state.\nAction changes you." },
+  { id: 25, title: "Anxiety Is Overthinking and Underreacting", pillar: "Cognitive Biases", content: "Anxiety is overthinking and underreacting.\n\nStress often comes from not taking action toward something you have control over." },
+  { id: 26, title: "Each Action Is a Brushstroke Toward Identity", pillar: "Identity", content: "Each action is a brushstroke toward the person you are becoming." },
+  { id: 27, title: "Ask for More Than Feels Reasonable", pillar: "Leadership", content: "Ask for things that feel unreasonable.\n\nIf you only ask for what you already get, you're not aiming high enough." },
+  { id: 28, title: "Prove Who You Are With Small Wins", pillar: "Identity", content: "Decide the type of person you want to be.\n\nProve it to yourself with small wins." },
+  { id: 29, title: "Channel Worry Into One Useful Action", pillar: "Mental Discipline", content: "Take all the energy you spend worrying —\n\nAbout the past. About the future. About what others think. About whether you might fail.\n\n… and channel it into one useful action within your control." },
+  { id: 30, title: "You Cannot Grow by Staying Within What You Can Already Do", pillar: "Craft & Mastery", content: "If you only do what you can already do, you will never be more than you are." },
+  { id: 31, title: "What Can I Stick to on My Worst Days?", pillar: "Mental Discipline", content: "When building a habit, don't ask what you can do on your best days.\n\nAsk what you can sustain on your worst days.\n\nStart small. Master consistency. Scale when ready." },
+  { id: 32, title: "Craving the Result Without the Process Guarantees Disappointment", pillar: "Mental Discipline", content: "If you aren't willing to do what it takes, release the desire.\n\nTo crave the result but reject the process guarantees disappointment." },
+  { id: 33, title: "Nothing Changes If Nothing Changes", pillar: "Mental Discipline", content: "Nothing changes if nothing changes." },
+  { id: 34, title: "What You Avoid Controls You", pillar: "Mental Discipline", content: "What you avoid controls you." },
+];
+
+const PILLARS = ["Identity","Mental Discipline","Perception","Resilience","Craft & Mastery","Wealth & Power","Leadership","Relationships","Mindfulness","Cognitive Biases"];
+const PS = {
+  Identity:           { accent: "#d8b4fe", bg: "linear-gradient(145deg, #221828 0%, #131620 100%)" },
+  "Mental Discipline":{ accent: "#d9f99d", bg: "linear-gradient(145deg, #1e2214 0%, #131620 100%)" },
+  Perception:         { accent: "#93e0ff", bg: "linear-gradient(145deg, #142028 0%, #131620 100%)" },
+  Resilience:         { accent: "#fdc88e", bg: "linear-gradient(145deg, #261c14 0%, #131620 100%)" },
+  "Craft & Mastery":  { accent: "#7ef0d8", bg: "linear-gradient(145deg, #142620 0%, #131620 100%)" },
+  "Wealth & Power":   { accent: "#fee770", bg: "linear-gradient(145deg, #262414 0%, #131620 100%)" },
+  Leadership:         { accent: "#fbb8da", bg: "linear-gradient(145deg, #26141e 0%, #131620 100%)" },
+  Relationships:      { accent: "#86efcb", bg: "linear-gradient(145deg, #142624 0%, #131620 100%)" },
+  Mindfulness:        { accent: "#b8c4ff", bg: "linear-gradient(145deg, #141828 0%, #131620 100%)" },
+  "Cognitive Biases": { accent: "#fdb8b8", bg: "linear-gradient(145deg, #261418 0%, #131620 100%)" },
+};
+function ps(p) { return PS[p] || { accent: "#94a3b8", bg: "#131620" }; }
+const T = { bg:"#0B0D12",s1:"#131620",s2:"#1a1e2c",t1:"#EAEBF0",t2:"#A0A5B8",t3:"#6B7089",bd:"rgba(255,255,255,0.07)",bdH:"rgba(255,255,255,0.14)",foc:"rgba(120,170,255,0.5)",dng:"#ef4444",dngD:"rgba(239,68,68,0.25)",r:10,rs:6,mono:"'SF Mono','Fira Code','Consolas',monospace",sans:"-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI','Helvetica Neue',sans-serif",serif:"'Georgia','Charter','Palatino',serif" };
+
+function shuffle(a) { const b = [...a]; for (let i = b.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; } return b; }
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function yesterdayStr() { const d = new Date(); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function hasNotes(e) { return typeof e?.notes === "string" && e.notes.trim().length > 0; }
+
+// ─── Swipe hook ──
+function useSwipe(onLeft, onRight) {
+  const startX = useRef(null);
+  const startY = useRef(null);
+  const onTouchStart = useCallback(e => { startX.current = e.touches[0].clientX; startY.current = e.touches[0].clientY; }, []);
+  const onTouchEnd = useCallback(e => {
+    if (startX.current === null) return;
+    const dx = e.changedTouches[0].clientX - startX.current;
+    const dy = e.changedTouches[0].clientY - startY.current;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) { if (dx < 0) onLeft(); else onRight(); }
+    startX.current = null;
+  }, [onLeft, onRight]);
+  const onClick = useCallback(e => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x > rect.width * 0.65) onLeft();
+    else if (x < rect.width * 0.35) onRight();
+  }, [onLeft, onRight]);
+  return { onTouchStart, onTouchEnd, onClick };
+}
+
+// ─── Fullscreen Quote ──
+function FullQuote({ entry, fadeKey, showTitle = true, immersive = false, animStyle = "fadeIn" }) {
+  if (!entry) return null;
+  const lines = entry.content.split("\n");
+  let paraIdx = 0;
+  return (
+    <div key={fadeKey} style={{
+      minHeight: immersive ? "auto" : "70vh",
+      display: "flex", flexDirection: "column", justifyContent: "center",
+      paddingTop: immersive ? 0 : 40, paddingBottom: immersive ? 0 : 40,
+      animation: `${animStyle} 0.24s cubic-bezier(0.25,0.1,0.25,1)`,
+    }}>
+      {showTitle && (
+        <h1 style={{ fontSize: 24, fontWeight: 600, color: T.t1, lineHeight: 1.35, letterSpacing: -0.3, marginBottom: 28 }}>
+          {entry.title}
+        </h1>
+      )}
+      <div style={immersive ? {} : { borderLeft: `2px solid ${ps(entry.pillar).accent}25`, paddingLeft: 24 }}>
+        {lines.map((ln, i) => {
+          const empty = !ln.trim();
+          if (!empty) paraIdx++;
+          const opac = immersive
+            ? (empty ? 1 : paraIdx === 1 ? 0.97 : 0.92)
+            : (empty ? 1 : 0.9);
+          return (
+            <p key={i} style={{
+              fontSize: immersive ? 17 : 16,
+              fontFamily: T.serif,
+              color: empty ? "transparent" : (immersive ? "rgba(255,255,255," + opac + ")" : T.t1),
+              lineHeight: immersive ? 1.74 : 1.9,
+              letterSpacing: immersive ? 0.15 : 0,
+              margin: empty ? "0 0 8px 0" : (immersive ? "0 0 20px 0" : "0 0 16px 0"),
+              opacity: immersive ? 1 : opac,
+            }}>{ln || "\u00A0"}</p>
+          );
+        })}
+      </div>
+      {hasNotes(entry) && (
+        <div style={{ marginTop: immersive ? 36 : 28, paddingTop: immersive ? 28 : 24 }}>
+          <div style={{ height: 1, background: "rgba(255,255,255,0.05)", marginBottom: 20 }} />
+          <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: "rgba(234,235,240,0.45)", marginBottom: 14 }}>Notes</div>
+          <div>
+            {entry.notes.trim().split("\n").map((ln, i) => (
+              <p key={i} style={{ fontSize: 15, fontFamily: T.serif, color: immersive ? "rgba(255,255,255,0.62)" : "rgba(234,235,240,0.65)", lineHeight: 1.85, margin: ln.trim() ? "0 0 14px 0" : "0 0 6px 0" }}>
+                {ln || "\u00A0"}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Layout ──
+const FOOTER_H = 64;
+
+function DynCard({ children, className, style = {} }) {
+  const ref = useRef(null);
+  const [offsetY, setOffsetY] = useState(0);
+  useEffect(() => {
+    function calc() {
+      if (!ref.current) return;
+      const vh = window.innerHeight;
+      const ch = ref.current.offsetHeight;
+      if (ch >= vh) { setOffsetY(0); }
+      else { const avail = vh - ch - FOOTER_H; setOffsetY(Math.min(140, Math.max(0, avail * 0.28))); }
+    }
+    calc();
+    const t = setTimeout(calc, 80);
+    window.addEventListener("resize", calc);
+    return () => { clearTimeout(t); window.removeEventListener("resize", calc); };
+  });
+  return (
+    <div ref={ref} className={className} style={{ ...style, transform: `translateY(${offsetY}px)`, transition: "transform 0.28s ease-in-out" }}>
+      {children}
+    </div>
+  );
+}
+
+function FooterBar({ mode, onNext, onFlip, onExit, flipDisabled, streak }) {
+  const base = {
+    position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40, height: FOOTER_H,
+    background: "rgba(28,30,38,0.92)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+    borderTop: "1px solid rgba(255,255,255,0.06)",
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    padding: "0 28px", paddingBottom: "env(safe-area-inset-bottom, 0px)",
+  };
+  const btn = { background: "none", border: "none", cursor: "pointer", padding: "8px 12px", fontSize: 14, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1, transition: "color 0.15s ease, transform 0.1s ease" };
+  const press = e => e.currentTarget.style.transform = "scale(0.97)";
+  const unpress = e => e.currentTarget.style.transform = "scale(1)";
+  const streakEl = streak > 0 ? (
+    <span style={{ fontSize: 12, fontFamily: T.mono, fontWeight: 500, color: "rgba(255,255,255,0.35)", letterSpacing: 0.5 }}>Streak: {streak}</span>
+  ) : <span />;
+
+  if (mode === "today") {
+    return (
+      <div style={base}>
+        {streakEl}
+        <button onClick={onNext} onMouseDown={press} onMouseUp={unpress} onMouseLeave={unpress}
+          style={{ ...btn, color: "rgba(255,255,255,0.55)" }}
+          onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.85)"}>Next ›</button>
+      </div>
+    );
+  }
+  return (
+    <div style={base}>
+      <button onClick={onExit} onMouseDown={press} onMouseUp={unpress} onMouseLeave={e => { unpress(e); e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
+        style={{ ...btn, color: "rgba(255,255,255,0.45)", fontSize: 12, letterSpacing: 1.5, textTransform: "uppercase" }}
+        onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.75)"}>Exit Review</button>
+      <button onClick={onFlip} disabled={flipDisabled} onMouseDown={press} onMouseUp={unpress} onMouseLeave={e => { unpress(e); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+        style={{ ...btn, color: "rgba(255,255,255,0.55)", opacity: flipDisabled ? 0.4 : 1, cursor: flipDisabled ? "default" : "pointer" }}
+        onMouseEnter={e => { if (!flipDisabled) e.currentTarget.style.color = "rgba(255,255,255,0.85)"; }}>Flip →</button>
+    </div>
+  );
+}
+
+function Overlay({ show, items }) {
+  return (
+    <div style={{
+      position: "fixed", bottom: 0, left: 0, right: 0,
+      background: "linear-gradient(transparent, rgba(11,13,18,0.95) 40%)",
+      padding: "60px 0 36px", display: "flex", justifyContent: "center", gap: 24,
+      opacity: show ? 1 : 0, pointerEvents: show ? "auto" : "none", transition: "opacity 0.3s ease", zIndex: 50,
+    }}>
+      {items.map(({ label, onClick }, i) => (
+        <button key={i} onClick={onClick} style={{
+          background: "none", border: `1px solid ${T.bdH}`, borderRadius: T.rs,
+          padding: "8px 20px", color: T.t2, fontSize: 12, fontFamily: T.mono,
+          fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer", transition: "all 0.2s ease",
+        }}
+          onMouseEnter={e => { e.currentTarget.style.color = T.t1; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+          onMouseLeave={e => { e.currentTarget.style.color = T.t2; e.currentTarget.style.borderColor = T.bdH; }}
+        >{label}</button>
+      ))}
+    </div>
+  );
+}
+
+function ERow({ entry, d, a, oc }) {
+  const s = ps(entry.pillar);
+  return (
+    <div onClick={oc} style={{ padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer", transition: "all 0.25s ease", opacity: a ? 1 : 0, transitionDelay: `${d}ms` }}
+      onMouseEnter={e => e.currentTarget.style.paddingLeft = "8px"} onMouseLeave={e => e.currentTarget.style.paddingLeft = "0"}>
+      <div style={{ fontSize: 15, fontWeight: 500, color: "#EAEBF0", marginBottom: 3, lineHeight: 1.4 }}>{entry.title}</div>
+      <div style={{ fontSize: 12, fontFamily: T.mono, fontWeight: 500, color: s.accent + "BB", letterSpacing: 0.5 }}>{entry.pillar}</div>
+    </div>
+  );
+}
+
+// ═══════════ APP ═══════════
+function Praxis() {
+  const [entries, setEntries] = useState([]);
+  const [view, setView] = useState("anchor");
+  const [selPillar, setSelPillar] = useState(null);
+  const [selEntry, setSelEntry] = useState(null);
+  const [anim, setAnim] = useState(false);
+  const [search, setSearch] = useState("");
+  const [entriesLoading, setEntriesLoading] = useState(true);
+
+  // Upload
+  const [uT, setUT] = useState(""); const [uC, setUC] = useState(""); const [uP, setUP] = useState(""); const [uS, setUS] = useState(false);
+
+  // Edit
+  const [editing, setEditing] = useState(false);
+  const [dT, setDT] = useState(""); const [dC, setDC] = useState(""); const [dP, setDP] = useState(""); const [dN, setDN] = useState("");
+  const [toast, setToast] = useState(null); const [pillarDD, setPillarDD] = useState(false);
+
+  // Anchor
+  const [anchorQueue, setAnchorQueue] = useState([]);
+  const [anchorIdx, setAnchorIdx] = useState(0);
+  const [anchorDate, setAnchorDate] = useState(null);
+
+  // Streak + Auth
+  const [streak, setStreak] = useState(0);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const authStreakDone = useRef(false);
+  const localStreakDone = useRef(false);
+
+  // Review
+  const [revPillars, setRevPillars] = useState([]);
+  const [revQueue, setRevQueue] = useState([]); const [revIdx, setRevIdx] = useState(0);
+  const [flipPhase, setFlipPhase] = useState("idle");
+  const flipTimer = useRef(null);
+
+  // Overlay
+  const [showOverlay, setShowOverlay] = useState(false);
+  const overlayTimer = useRef(null);
+
+  // Settings panel
+  const [showSettings, setShowSettings] = useState(false);
+
+  // ─── Effects ──
+  useEffect(() => { setAnim(false); const t = setTimeout(() => setAnim(true), 40); return () => clearTimeout(t); }, [view, selPillar, selEntry]);
+  useEffect(() => { if (editing) { const h = e => { if (e.key === "Escape") cancelEdit(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); } }, [editing]);
+  useEffect(() => { if (!pillarDD) return; const h = () => setPillarDD(false); window.addEventListener("click", h); return () => window.removeEventListener("click", h); }, [pillarDD]);
+
+  // Build anchor deck — persist daily anchor in Firestore
+  useEffect(() => {
+    if (entries.length === 0 || !user) { setAnchorQueue([]); return; }
+    const today = todayStr();
+    if (anchorDate === today && anchorQueue.length > 0) return;
+
+    (async () => {
+      const ref = fbDb.collection("users").doc(user.uid);
+      let savedAnchorId = null;
+      try {
+        const snap = await ref.get();
+        if (snap.exists) {
+          const data = snap.data();
+          if (data.anchorDate === today && data.anchorId != null) {
+            savedAnchorId = data.anchorId;
+          }
+        }
+      } catch(e) { console.warn("Anchor read failed", e); }
+
+      // Use saved anchor or pick a new one
+      const dailyId = savedAnchorId != null && entries.find(e => String(e.id) === String(savedAnchorId))
+        ? savedAnchorId
+        : entries[Math.floor(Math.random() * entries.length)].id;
+
+      const rest = shuffle(entries.filter(e => String(e.id) !== String(dailyId)).map(e => e.id));
+      setAnchorQueue([dailyId, ...rest]);
+      setAnchorIdx(0);
+      setAnchorDate(today);
+
+      // Save to Firestore if new
+      if (savedAnchorId == null || String(savedAnchorId) !== String(dailyId)) {
+        try { await ref.set({ anchorDate: today, anchorId: dailyId }, { merge: true }); } catch(e) {}
+      }
+    })();
+  }, [entries.length, user]);
+
+  // ─── Firebase Auth listener (no auto-popup — sign-in button handles it) ──
+  useEffect(() => {
+    const unsub = fbAuth.onAuthStateChanged((u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // ─── Load entries from Firestore (initialized flag, not empty-check) ──
+  const entriesLoadedForUid = useRef(null);
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setEntries(ENTRIES.map(e => ({ ...e, notes: null })));
+      setEntriesLoading(false);
+      entriesLoadedForUid.current = null;
+      return;
+    }
+    if (entriesLoadedForUid.current === user.uid) return;
+    entriesLoadedForUid.current = user.uid;
+    setEntriesLoading(true);
+    (async () => {
+      const userRef = fbDb.collection("users").doc(user.uid);
+      const col = userRef.collection("entries");
+      try {
+        // Check initialized flag on user doc (not empty collection)
+        const userSnap = await userRef.get();
+        const isInitialized = userSnap.exists && userSnap.data().entriesInitialized === true;
+
+        if (!isInitialized) {
+          // First login: seed default entries to Firestore with required fields
+          const batch = fbDb.batch();
+          const now = firebase.firestore.FieldValue.serverTimestamp();
+          const seeded = ENTRIES.map(e => {
+            const id = String(e.id);
+            const data = {
+              title: e.title,
+              content: e.content,
+              pillar: e.pillar,
+              notes: null,
+              ownerId: user.uid,
+              createdAt: now,
+              updatedAt: now,
+              schemaVersion: SCHEMA_VERSION,
+              deleted: false,
+            };
+            batch.set(col.doc(id), data);
+            return { ...data, id, notes: null, createdAt: null, updatedAt: null };
+          });
+          // Set initialized flag on user doc
+          batch.set(userRef, { entriesInitialized: true }, { merge: true });
+          await batch.commit();
+          setEntries(seeded.filter(e => !e.deleted));
+        } else {
+          // Load existing entries, filter out soft-deleted
+          const snap = await col.where("deleted", "==", false).get();
+          const loaded = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          setEntries(loaded);
+        }
+      } catch(e) {
+        console.warn("Failed to load entries", e);
+        setEntries(ENTRIES.map(e => ({ ...e, notes: null })));
+      }
+      setEntriesLoading(false);
+    })();
+  }, [authLoading, user]);
+
+  // ─── Firestore streak (signed-in users) ──
+  useEffect(() => {
+    if (!user || authStreakDone.current) return;
+    authStreakDone.current = true;
+    (async () => {
+      const today = todayStr();
+      const yesterday = yesterdayStr();
+      const ref = fbDb.collection("users").doc(user.uid);
+      let count = 0, lastDate = null;
+      try {
+        const snap = await ref.get();
+        if (snap.exists) { const data = snap.data(); count = data.streak || 0; lastDate = data.lastOpenDate || null; }
+      } catch(e) { console.warn("Firestore read failed", e); }
+
+      if (lastDate === null) { count = 1; }
+      else if (lastDate === today) {
+        setStreak(count);
+        try { await ref.set({ lastLoginAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch(e) {}
+        return;
+      }
+      else if (lastDate === yesterday) { count = count + 1; }
+      else { count = 1; }
+
+      setStreak(count);
+      try {
+        await ref.set({
+          uid: user.uid, displayName: user.displayName || "", email: user.email || "", photoURL: user.photoURL || "",
+          ...(!lastDate ? { createdAt: firebase.firestore.FieldValue.serverTimestamp() } : {}),
+          lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+          streak: count, lastOpenDate: today,
+        }, { merge: true });
+      } catch(e) { console.warn("Firestore write failed", e); }
+    })();
+  }, [user]);
+
+  // ─── localStorage streak (not signed in) ──
+  useEffect(() => {
+    if (authLoading || user || localStreakDone.current) return;
+    localStreakDone.current = true;
+    const today = todayStr();
+    const yesterday = yesterdayStr();
+    let lastDate = null, count = 0;
+    try { const raw = localStorage.getItem("praxis_streak"); if (raw) { const p = JSON.parse(raw); lastDate = p.lastOpenDate || null; count = p.streak || 0; } } catch(e) {}
+    if (lastDate === null) { count = 1; }
+    else if (lastDate === today) { setStreak(count); return; }
+    else if (lastDate === yesterday) { count = count + 1; }
+    else { count = 1; }
+    setStreak(count);
+    try { localStorage.setItem("praxis_streak", JSON.stringify({ lastOpenDate: today, streak: count })); } catch(e) {}
+  }, [authLoading, user]);
+
+  // Derived
+  const liveEntry = selEntry ? entries.find(e => e.id === selEntry.id) || selEntry : null;
+  const counts = PILLARS.map(p => ({ p, n: entries.filter(e => e.pillar === p).length }));
+  const filtered = selPillar ? entries.filter(e => e.pillar === selPillar) : entries;
+  const results = search.trim() ? entries.filter(e => e.title.toLowerCase().includes(search.toLowerCase()) || e.content.toLowerCase().includes(search.toLowerCase()) || e.pillar.toLowerCase().includes(search.toLowerCase())) : null;
+  const anchorEntry = anchorQueue.length > 0 ? entries.find(e => e.id === anchorQueue[anchorIdx % anchorQueue.length]) : null;
+  const revEntry = revQueue.length > 0 ? entries.find(e => e.id === revQueue[revIdx % revQueue.length]) : null;
+  const fadeUp = (d = 0) => ({ opacity: anim ? 1 : 0, transform: anim ? "translateY(0)" : "translateY(8px)", transition: `opacity 0.4s ease ${d}ms, transform 0.4s ease ${d}ms` });
+
+  // ─── Haptic ──
+  function haptic() { try { if (navigator.vibrate) navigator.vibrate(12); } catch(e) {} }
+
+  // ─── Auth actions ──
+  const [authError, setAuthError] = useState(null);
+  async function signInWithGoogle() {
+    setAuthError(null);
+    try {
+      await fbAuth.signInWithPopup(googleProvider);
+    } catch(e) {
+      console.error("Sign-in error:", e.code, e.message);
+      setAuthError(e.code + ": " + e.message);
+    }
+  }
+  async function handleSignOut() {
+    try { await fbAuth.signOut(); setStreak(0); authStreakDone.current = false; localStreakDone.current = false; entriesLoadedForUid.current = null; setEntries(ENTRIES.map(e => ({ ...e, notes: null }))); } catch(e) { console.error(e); }
+  }
+
+  // ─── Export (mandatory per Master App OS) ──
+  function exportData() {
+    const data = {
+      app: APP_NAME,
+      version: APP_VERSION,
+      exportDate: new Date().toISOString(),
+      schemaVersion: SCHEMA_VERSION,
+      entries: entries.map(e => ({
+        id: e.id,
+        title: e.title,
+        content: e.content,
+        pillar: e.pillar,
+        notes: e.notes || null,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `praxis-export-${todayStr()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setToast("Export downloaded");
+    setTimeout(() => setToast(null), 2500);
+  }
+
+  // ─── Import ──
+  function importData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.entries || !Array.isArray(data.entries)) { setToast("Invalid export file"); setTimeout(() => setToast(null), 2500); return; }
+        const now = firebase.firestore.FieldValue.serverTimestamp();
+        const imported = data.entries.map(entry => {
+          const id = String(entry.id || Date.now() + Math.random());
+          return {
+            id,
+            title: entry.title || "Untitled",
+            content: entry.content || "",
+            pillar: entry.pillar || "Identity",
+            notes: entry.notes || null,
+            ownerId: user?.uid || null,
+            createdAt: now,
+            updatedAt: now,
+            schemaVersion: SCHEMA_VERSION,
+            deleted: false,
+          };
+        });
+        if (user) {
+          const col = fbDb.collection("users").doc(user.uid).collection("entries");
+          const batch = fbDb.batch();
+          imported.forEach(entry => {
+            const { id, ...rest } = entry;
+            batch.set(col.doc(id), rest);
+          });
+          await batch.commit();
+        }
+        setEntries(prev => [...imported, ...prev]);
+        setToast(`Imported ${imported.length} entries`);
+        setTimeout(() => setToast(null), 2500);
+      } catch(err) {
+        console.error("Import failed", err);
+        setToast("Import failed — invalid file");
+        setTimeout(() => setToast(null), 2500);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  // ─── Actions ──
+  function goTo(v, p, e) { setView(v); setSelPillar(p || null); setSelEntry(e || null); setSearch(""); if (v !== "entry") setEditing(false); setShowOverlay(false); setShowSettings(false); }
+
+  function saveNew() {
+    if (!uT.trim() || !uC.trim() || !uP || uS) return;
+    const id = String(Date.now());
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+    const entry = {
+      id,
+      title: uT.trim(),
+      content: uC.trim(),
+      pillar: uP,
+      notes: null,
+      ownerId: user?.uid || null,
+      createdAt: null,
+      updatedAt: null,
+      schemaVersion: SCHEMA_VERSION,
+      deleted: false,
+    };
+    setEntries(p => [entry, ...p]);
+    setUS(true); haptic(); setToast("Entry Saved");
+    if (user) {
+      fbDb.collection("users").doc(user.uid).collection("entries").doc(id)
+        .set({
+          title: entry.title,
+          content: entry.content,
+          pillar: entry.pillar,
+          notes: null,
+          ownerId: user.uid,
+          createdAt: now,
+          updatedAt: now,
+          schemaVersion: SCHEMA_VERSION,
+          deleted: false,
+        })
+        .catch(e => console.warn("Save failed", e));
+    }
+    setTimeout(() => { setToast(null); setUS(false); setUT(""); setUC(""); setUP(""); goTo("library"); }, 1000);
+  }
+
+  function startEdit() { const e = entries.find(x => x.id === selEntry?.id); if (!e) return; setDT(e.title); setDC(e.content); setDP(e.pillar); setDN(e.notes || ""); setEditing(true); }
+  function cancelEdit() { setEditing(false); setPillarDD(false); }
+
+  function saveEdit() {
+    if (!dT.trim() || !dC.trim() || !dP || !selEntry) return;
+    const cur = entries.find(e => e.id === selEntry.id); if (!cur) return;
+    const oldP = cur.pillar;
+    const updated = { ...cur, title: dT.trim(), content: dC.trim(), pillar: dP, notes: dN.trim() || null };
+    setEntries(p => p.map(e => e.id === cur.id ? updated : e)); setSelEntry(updated); setEditing(false); setPillarDD(false);
+    setToast(dP !== oldP ? `Updated · Moved to ${dP}` : "Updated"); setTimeout(() => setToast(null), 2500);
+    if (user) {
+      fbDb.collection("users").doc(user.uid).collection("entries").doc(String(cur.id))
+        .set({
+          title: updated.title,
+          content: updated.content,
+          pillar: updated.pillar,
+          notes: updated.notes,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true })
+        .catch(e => console.warn("Edit save failed", e));
+    }
+  }
+
+  // Soft delete (per Master App OS — never hard delete)
+  function del(id) {
+    setEntries(p => p.filter(e => e.id !== id));
+    setSelEntry(null);
+    goTo("library");
+    if (user) {
+      fbDb.collection("users").doc(user.uid).collection("entries").doc(String(id))
+        .set({ deleted: true, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+        .catch(e => console.warn("Soft delete failed", e));
+    }
+  }
+
+  function goBack() { if (editing) { cancelEdit(); return; } if (view === "entry" && selPillar) goTo("category", selPillar); else goTo("library"); }
+
+  // Review
+  function beginReview() {
+    const pool = entries.filter(e => revPillars.includes(e.pillar)).map(e => e.id);
+    if (pool.length === 0) return;
+    setRevQueue(shuffle(pool)); setRevIdx(0); setView("review-play");
+  }
+  function revNext() { const n = revIdx + 1; if (n >= revQueue.length) { const pool = entries.filter(e => revPillars.includes(e.pillar)).map(e => e.id); setRevQueue(shuffle(pool)); setRevIdx(0); } else setRevIdx(n); }
+  function doFlip() {
+    if (flipPhase !== "idle") return;
+    haptic(); setFlipPhase("out"); clearTimeout(flipTimer.current);
+    flipTimer.current = setTimeout(() => { revNext(); setFlipPhase("in"); flipTimer.current = setTimeout(() => setFlipPhase("idle"), 220); }, 140);
+  }
+  function revPrev() { setRevIdx(i => i > 0 ? i - 1 : i); }
+  function toggleRP(p) { setRevPillars(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]); }
+
+  function toggleOverlay(e) {
+    if (e && e.currentTarget) { const rect = e.currentTarget.getBoundingClientRect(); const x = e.clientX - rect.left; if (x < rect.width * 0.35 || x > rect.width * 0.65) return; }
+    setShowOverlay(v => !v);
+  }
+
+  const revSwipe = useSwipe(doFlip, revPrev);
+  const isImmersive = view === "anchor" || view === "review-play";
+
+  // ─── RENDER ──
+
+  // Auth still loading
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 32, fontWeight: 600, color: T.t1, letterSpacing: -0.5, marginBottom: 12 }}>Praxis</div>
+          <div style={{ fontSize: 13, fontFamily: T.mono, color: T.t3, letterSpacing: 1 }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Auth done but no user — show sign-in button
+  if (!user) {
+    return (
+      <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 32, fontWeight: 600, color: T.t1, letterSpacing: -0.5, marginBottom: 28 }}>Praxis</div>
+          <button onClick={signInWithGoogle} style={{
+            padding: "14px 32px", background: T.s2, border: `1px solid ${T.bdH}`, borderRadius: T.rs,
+            color: T.t1, fontSize: 14, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1, cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = T.bdH; }}>Sign in with Google</button>
+          {authError && (
+            <div style={{ marginTop: 20, padding: "12px 20px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, maxWidth: 400 }}>
+              <div style={{ fontSize: 12, fontFamily: T.mono, color: "#fca5a5", wordBreak: "break-all" }}>{authError}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Signed in but entries still loading
+  if (entriesLoading) {
+    return (
+      <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 32, fontWeight: 600, color: T.t1, letterSpacing: -0.5, marginBottom: 12 }}>Praxis</div>
+          <div style={{ fontSize: 13, fontFamily: T.mono, color: T.t3, letterSpacing: 1 }}>Loading your library...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: T.bg, color: T.t1, fontFamily: T.sans, WebkitFontSmoothing: "antialiased" }}>
+      <style>{`
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        ::selection{background:rgba(120,170,255,0.25)}
+        input::placeholder,textarea::placeholder{color:${T.t3}}
+        input:focus,textarea:focus{outline:none;box-shadow:0 0 0 2px ${T.foc}}
+        button:focus-visible{outline:2px solid ${T.foc};outline-offset:2px}
+        textarea{resize:vertical}
+        textarea::-webkit-scrollbar{width:4px}
+        textarea::-webkit-scrollbar-track{background:transparent}
+        textarea::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes flipOut{0%{opacity:1;transform:translateX(0) scale(1)}100%{opacity:0;transform:translateX(-36px) scale(0.98)}}
+        @keyframes flipIn{0%{opacity:0;transform:translateX(36px) scale(0.98)}100%{opacity:1;transform:translateX(0) scale(1)}}
+        @keyframes flipSweep{0%{opacity:0}15%{opacity:1}85%{opacity:1}100%{opacity:0}}
+        .featured{
+          border:1px solid rgba(180,170,255,0.10);
+          box-shadow:0 0 20px 2px rgba(180,170,255,0.04), 0 4px 24px rgba(0,0,0,0.35);
+          background:rgba(255,255,255,0.018);
+          border-radius:14px;
+          padding:40px 36px;
+          height:auto;
+          min-height:240px;
+        }
+        @media(max-width:520px){.featured{padding:28px 20px;border-radius:12px;min-height:200px}}
+      `}</style>
+
+      {/* ═══════ TODAY ═══════ */}
+      {view === "anchor" && (
+        <div style={{ minHeight: "100vh", padding: `0 28px ${FOOTER_H + 48}px`, maxWidth: 640, margin: "0 auto", cursor: "default", userSelect: "none", background: "transparent" }}>
+          {entriesLoading ? (
+            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <p style={{ color: T.t3, fontSize: 14, fontFamily: T.mono, letterSpacing: 1 }}>Loading…</p>
+            </div>
+          ) : entries.length === 0 ? (
+            <div style={{ minHeight: "60vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: "14vh" }}>
+              <p style={{ color: T.t2, fontSize: 16, marginBottom: 20 }}>Your library is empty.</p>
+              <button onClick={() => goTo("upload")} style={{ padding: "12px 28px", background: T.s2, border: `1px solid ${T.bdH}`, borderRadius: T.rs, color: T.t1, fontSize: 14, cursor: "pointer" }}>+ Add your first entry</button>
+            </div>
+          ) : anchorEntry ? (
+            <DynCard className="featured">
+              <FullQuote entry={anchorEntry} fadeKey="today" showTitle={false} immersive />
+            </DynCard>
+          ) : null}
+          <FooterBar mode="today" onNext={() => goTo("library")} streak={streak} />
+        </div>
+      )}
+
+      {/* ═══════ REVIEW PLAYBACK ═══════ */}
+      {view === "review-play" && (
+        <div {...revSwipe} style={{ minHeight: "100vh", padding: `0 28px ${FOOTER_H + 48}px`, maxWidth: 640, margin: "0 auto", userSelect: "none", background: "transparent" }}>
+          {revEntry ? (
+            <div style={{
+              animation: flipPhase === "out" ? "flipOut 0.16s ease-in forwards" : flipPhase === "in" ? "flipIn 0.2s ease-out forwards" : "none",
+            }}>
+              <DynCard className="featured">
+                <FullQuote entry={revEntry} fadeKey={flipPhase === "idle" ? revIdx : undefined} showTitle={false} immersive animStyle="none" />
+              </DynCard>
+            </div>
+          ) : (
+            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <p style={{ color: T.t2 }}>No entries in selected pillars.</p>
+            </div>
+          )}
+          {flipPhase !== "idle" && (
+            <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none", zIndex: 20,
+              background: "linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.08) 60%, transparent 100%)",
+              animation: "flipSweep 0.36s ease-in-out forwards" }} />
+          )}
+          <FooterBar mode="review" onFlip={doFlip} onExit={() => goTo("library")} flipDisabled={flipPhase !== "idle"} />
+        </div>
+      )}
+
+      {/* ═══════ REVIEW PILLAR PICKER ═══════ */}
+      {view === "review-select" && (
+        <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 24px" }}>
+          <div style={{ padding: "40px 0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <button onClick={() => goTo("anchor")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 13, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase", color: T.t2 }}
+              onMouseEnter={e => e.currentTarget.style.color = T.t1} onMouseLeave={e => e.currentTarget.style.color = T.t2}>← Back</button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 28, ...fadeUp() }}>
+            {PILLARS.map((p, i) => {
+              const s = ps(p); const sel = revPillars.includes(p); const n = entries.filter(e => e.pillar === p).length;
+              return (
+                <div key={p} onClick={() => toggleRP(p)} style={{
+                  background: s.bg, border: `1px solid ${sel ? s.accent + "45" : "rgba(255,255,255,0.04)"}`,
+                  borderRadius: T.r, padding: "22px 20px", cursor: "pointer", transition: "all 0.25s ease", opacity: sel ? 1 : 0.4,
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = s.accent + "60"}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = sel ? s.accent + "45" : "rgba(255,255,255,0.04)"}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: T.t1, marginBottom: 4, lineHeight: 1.3 }}>{p}</div>
+                  <div style={{ fontSize: 12, fontFamily: T.mono, fontWeight: 500, color: T.t2 }}>{n} {n === 1 ? "entry" : "entries"}</div>
+                </div>
+              );
+            })}
+          </div>
+          {revPillars.length === 0 && (
+            <div style={{ fontSize: 12, fontFamily: T.mono, color: T.t3, marginBottom: 12, letterSpacing: 0.5 }}>Select at least one pillar</div>
+          )}
+          <button onClick={beginReview} disabled={revPillars.length === 0} style={{
+            padding: "14px 0", width: "100%", borderRadius: T.rs, cursor: revPillars.length > 0 ? "pointer" : "default",
+            background: revPillars.length > 0 ? T.s2 : T.s1, border: `1px solid ${revPillars.length > 0 ? T.bdH : T.bd}`,
+            color: revPillars.length > 0 ? T.t1 : T.t3, fontSize: 13, fontFamily: T.mono, fontWeight: 600,
+            letterSpacing: 2.5, textTransform: "uppercase", transition: "all 0.25s ease", opacity: revPillars.length > 0 ? 1 : 0.5,
+          }}>Start</button>
+        </div>
+      )}
+
+      {/* ═══════ NON-IMMERSIVE VIEWS ═══════ */}
+      {!isImmersive && view !== "review-select" && view !== "review-play" && (
+        <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 24px" }}>
+          {/* Header */}
+          <header style={{ padding: "40px 0 24px", borderBottom: `1px solid ${T.bd}`, marginBottom: 32 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
+                <div style={{ cursor: "pointer" }} onClick={() => goTo("anchor")}>
+                  <div style={{ fontSize: 32, fontWeight: 600, color: T.t1, letterSpacing: -0.5, lineHeight: 1.2 }}>Praxis</div>
+                </div>
+                {streak > 0 && <span style={{ fontSize: 12, fontFamily: T.mono, fontWeight: 500, color: T.t3, letterSpacing: 0.5, marginBottom: 2 }}>Streak: {streak}</span>}
+              </div>
+              {/* Settings gear */}
+              <button onClick={() => setShowSettings(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px", fontSize: 18, color: T.t3, transition: "color 0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.color = T.t1} onMouseLeave={e => e.currentTarget.style.color = T.t3}
+                title="Settings">⚙</button>
+            </div>
+
+            {/* Settings dropdown */}
+            {showSettings && (
+              <div style={{ background: T.s2, border: `1px solid ${T.bdH}`, borderRadius: T.r, padding: "16px 20px", marginBottom: 16, animation: "fadeIn 0.2s ease" }}>
+                <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 3, textTransform: "uppercase", color: T.t3, marginBottom: 14 }}>Settings</div>
+
+                {/* Version stamp (mandatory per Master App OS) */}
+                <div style={{ fontSize: 12, fontFamily: T.mono, color: T.t3, marginBottom: 16, lineHeight: 1.6 }}>
+                  Build: {APP_NAME} {APP_VERSION} — {BUILD_DATE}<br />
+                  Env: Production
+                </div>
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <button onClick={exportData} style={{ padding: "8px 16px", background: T.s1, border: `1px solid ${T.bd}`, borderRadius: T.rs, color: T.t2, fontSize: 12, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1, cursor: "pointer", transition: "all 0.2s" }}
+                    onMouseEnter={e => { e.currentTarget.style.color = T.t1; e.currentTarget.style.borderColor = T.bdH; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = T.t2; e.currentTarget.style.borderColor = T.bd; }}>Export JSON</button>
+
+                  <label style={{ padding: "8px 16px", background: T.s1, border: `1px solid ${T.bd}`, borderRadius: T.rs, color: T.t2, fontSize: 12, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1, cursor: "pointer", transition: "all 0.2s", display: "inline-block" }}>
+                    Import JSON
+                    <input type="file" accept=".json" onChange={importData} style={{ display: "none" }} />
+                  </label>
+
+                  {user && (
+                    <button onClick={handleSignOut} style={{ padding: "8px 16px", background: T.s1, border: `1px solid ${T.dngD}`, borderRadius: T.rs, color: "rgba(239,68,68,0.6)", fontSize: 12, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1, cursor: "pointer", transition: "all 0.2s" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = T.dng; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "rgba(239,68,68,0.6)"; }}>Sign Out</button>
+                  )}
+                </div>
+
+                {user && (
+                  <div style={{ marginTop: 12, fontSize: 12, fontFamily: T.mono, color: T.t3 }}>
+                    Signed in as {user.displayName || user.email}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <nav style={{ display: "flex", gap: 6 }}>
+              {[["anchor","Today"],["review-select","Review"],["library","Library"],["upload","+ Add"]].map(([k, l]) => {
+                const a = k === "library" ? ["library","category","entry"].includes(view) : view === k;
+                return <button key={k} onClick={() => goTo(k)} style={{ padding: "8px 18px", borderRadius: T.rs, cursor: "pointer", background: a ? T.s2 : "transparent", border: `1px solid ${a ? T.bdH : T.bd}`, color: a ? T.t1 : T.t2, fontSize: 12, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase", transition: "all 0.2s ease" }}>{l}</button>;
+              })}
+            </nav>
+          </header>
+
+          {/* Upload */}
+          {view === "upload" && (
+            <div style={fadeUp()}>
+              <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: T.t3, marginBottom: 16 }}>New Entry</div>
+              <input type="text" placeholder="Title" value={uT} onChange={e => setUT(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", borderBottom: `1px solid ${T.bdH}`, color: T.t1, fontSize: 20, fontWeight: 500, fontFamily: T.sans, padding: "12px 0", marginBottom: 20, lineHeight: 1.4 }} />
+              <textarea placeholder="Paste your text here..." value={uC} onChange={e => setUC(e.target.value)} rows={7} style={{ width: "100%", background: T.s1, border: `1px solid ${T.bd}`, borderRadius: T.r, color: T.t1, fontSize: 15, fontFamily: T.serif, padding: "16px 18px", lineHeight: 1.8, boxSizing: "border-box" }} />
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: T.t3, marginBottom: 12 }}>Pillar</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {PILLARS.map(p => { const a = uP === p, s = ps(p); return <button key={p} onClick={() => setUP(a ? "" : p)} style={{ padding: "7px 16px", borderRadius: 20, cursor: "pointer", background: a ? s.accent + "1A" : T.s1, border: `1px solid ${a ? s.accent + "55" : T.bd}`, color: a ? s.accent : T.t2, fontSize: 13, fontWeight: 500, fontFamily: T.sans, transition: "all 0.2s ease" }}>{p}</button>; })}
+                </div>
+              </div>
+              <button onClick={saveNew} disabled={!uT.trim() || !uC.trim() || !uP || uS} style={{ marginTop: 28, padding: "14px 0", width: "100%", borderRadius: T.rs, cursor: uT.trim() && uC.trim() && uP && !uS ? "pointer" : "default", background: uS ? T.s2 : (uT.trim() && uC.trim() && uP ? T.s2 : T.s1), border: `1px solid ${uT.trim() && uC.trim() && uP ? T.bdH : T.bd}`, color: uS ? T.t1 : (uT.trim() && uC.trim() && uP ? T.t1 : T.t3), fontSize: 13, fontFamily: T.mono, fontWeight: 600, letterSpacing: 2.5, textTransform: "uppercase", transition: "all 0.25s ease", opacity: uS ? 0.7 : 1 }}>{uS ? "✓  Entry Saved" : "Save Entry"}</button>
+            </div>
+          )}
+
+          {/* Library */}
+          {view === "library" && (
+            <div style={fadeUp()}>
+              <input type="text" placeholder="Search entries..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: "100%", background: T.s1, border: `1px solid ${T.bd}`, borderRadius: T.r, color: T.t1, fontSize: 15, fontFamily: T.sans, padding: "12px 16px", marginBottom: 28, boxSizing: "border-box" }} />
+              {results !== null ? (
+                <>
+                  <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: T.t3, marginBottom: 16 }}>{results.length} result{results.length !== 1 ? "s" : ""}</div>
+                  {results.map((e, i) => <ERow key={e.id} entry={e} d={i * 40} a={anim} oc={() => goTo("entry", null, e)} />)}
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: T.t3, marginBottom: 16 }}>{entries.length} entries · {counts.filter(c => c.n > 0).length} pillars</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {counts.filter(c => c.n > 0).map(({ p, n }, i) => { const s = ps(p); return (
+                      <div key={p} onClick={() => goTo("category", p)} style={{ ...fadeUp(i * 50), background: s.bg, border: `1px solid ${s.accent}18`, borderRadius: T.r, padding: "22px 20px", cursor: "pointer", transition: "all 0.25s ease" }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = s.accent + "45"} onMouseLeave={e => e.currentTarget.style.borderColor = s.accent + "18"}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: T.t1, marginBottom: 4, lineHeight: 1.3 }}>{p}</div>
+                        <div style={{ fontSize: 12, fontFamily: T.mono, fontWeight: 500, color: T.t2 }}>{n} {n === 1 ? "entry" : "entries"}</div>
+                      </div>
+                    ); })}
+                  </div>
+                  {counts.filter(c => c.n === 0).length > 0 && (
+                    <div style={{ marginTop: 20, marginBottom: 20 }}>
+                      <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 500, color: T.t3, letterSpacing: 3, textTransform: "uppercase", marginBottom: 10 }}>Empty</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{counts.filter(c => c.n === 0).map(({ p }) => <span key={p} style={{ fontSize: 12, fontFamily: T.mono, color: T.t3, padding: "4px 12px", border: `1px solid ${T.bd}`, borderRadius: 16 }}>{p}</span>)}</div>
+                    </div>
+                  )}
+                  <div style={{ marginTop: 36 }}>
+                    <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: T.t3, marginBottom: 16 }}>All Entries</div>
+                    {entries.map((e, i) => <ERow key={e.id} entry={e} d={250 + i * 20} a={anim} oc={() => goTo("entry", null, e)} />)}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Category */}
+          {view === "category" && selPillar && (
+            <div style={fadeUp()}>
+              <button onClick={() => goTo("library")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 24, fontSize: 13, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase", color: T.t2 }}
+                onMouseEnter={e => e.currentTarget.style.color = T.t1} onMouseLeave={e => e.currentTarget.style.color = T.t2}>← Back</button>
+              <h2 style={{ fontSize: 24, fontWeight: 600, color: T.t1, letterSpacing: -0.3, marginBottom: 4 }}>{selPillar}</h2>
+              <div style={{ fontSize: 12, fontFamily: T.mono, fontWeight: 500, color: T.t2, marginBottom: 28 }}>{filtered.length} {filtered.length === 1 ? "entry" : "entries"}</div>
+              {filtered.map((entry, i) => { const s = ps(selPillar); return (
+                <div key={entry.id} onClick={() => goTo("entry", selPillar, entry)} style={{ ...fadeUp(i * 60), padding: "18px 20px", background: T.s1, border: `1px solid ${T.bd}`, borderRadius: T.r, marginBottom: 8, cursor: "pointer", transition: "all 0.25s ease" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = s.accent + "35"; e.currentTarget.style.background = T.s2; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.bd; e.currentTarget.style.background = T.s1; }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: T.t1, marginBottom: 5, lineHeight: 1.4 }}>{entry.title}</div>
+                  <div style={{ fontSize: 14, color: T.t2, lineHeight: 1.55, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{entry.content}</div>
+                </div>
+              ); })}
+            </div>
+          )}
+
+          {/* Entry Detail */}
+          {view === "entry" && liveEntry && (
+            <div style={fadeUp()}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+                <button onClick={goBack} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 13, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase", color: T.t2 }}
+                  onMouseEnter={e => e.currentTarget.style.color = T.t1} onMouseLeave={e => e.currentTarget.style.color = T.t2}>← Back</button>
+                {!editing ? (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: T.mono, fontWeight: 600, color: ps(liveEntry.pillar).accent, letterSpacing: 2, textTransform: "uppercase", padding: "5px 12px", background: ps(liveEntry.pillar).accent + "12", borderRadius: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: ps(liveEntry.pillar).accent, display: "inline-block" }} />{liveEntry.pillar}
+                  </div>
+                ) : (
+                  <div style={{ position: "relative" }}>
+                    <button onClick={e => { e.stopPropagation(); setPillarDD(!pillarDD); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: T.mono, fontWeight: 600, color: ps(dP).accent, letterSpacing: 2, textTransform: "uppercase", padding: "5px 12px", background: ps(dP).accent + "12", borderRadius: 4, border: `1px solid ${ps(dP).accent}30`, cursor: "pointer" }}>
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: ps(dP).accent, display: "inline-block" }} />{dP} <span style={{ fontSize: 9, marginLeft: 4, opacity: 0.6 }}>▼</span>
+                    </button>
+                    {pillarDD && (
+                      <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 100, background: T.s2, border: `1px solid ${T.bdH}`, borderRadius: T.r, padding: "6px 0", minWidth: 220, boxShadow: "0 12px 40px rgba(0,0,0,0.5)" }}>
+                        {PILLARS.map(p => { const s = ps(p), a = dP === p; return <button key={p} onClick={() => { setDP(p); setPillarDD(false); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 16px", background: a ? s.accent + "10" : "transparent", border: "none", cursor: "pointer", textAlign: "left", color: a ? s.accent : T.t2, fontSize: 13, fontFamily: T.sans, fontWeight: 500 }}
+                          onMouseEnter={e => { if (!a) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }} onMouseLeave={e => { if (!a) e.currentTarget.style.background = "transparent"; }}>
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.accent }} />{p}
+                        </button>; })}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!editing ? (
+                  <button onClick={startEdit} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 12, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", color: T.t3 }}
+                    onMouseEnter={e => e.currentTarget.style.color = T.t1} onMouseLeave={e => e.currentTarget.style.color = T.t3}>Edit</button>
+                ) : (
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <button onClick={cancelEdit} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 12, fontFamily: T.mono, fontWeight: 500, letterSpacing: 1, textTransform: "uppercase", color: T.t3 }}
+                      onMouseEnter={e => e.currentTarget.style.color = T.t1} onMouseLeave={e => e.currentTarget.style.color = T.t3}>Cancel</button>
+                    <button onClick={saveEdit} style={{ background: T.s2, border: `1px solid ${T.bdH}`, borderRadius: T.rs, cursor: "pointer", padding: "5px 14px", fontSize: 12, fontFamily: T.mono, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", color: T.t1 }}>Save</button>
+                  </div>
+                )}
+              </div>
+              {!editing && (
+                <>
+                  <FullQuote entry={liveEntry} fadeKey={liveEntry.id} />
+                  <button onClick={() => del(liveEntry.id)} style={{ marginTop: 20, background: "transparent", border: `1px solid ${T.dngD}`, borderRadius: T.rs, color: "rgba(239,68,68,0.5)", cursor: "pointer", fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", padding: "8px 18px", transition: "all 0.2s ease" }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = T.dng + "60"; e.currentTarget.style.color = T.dng + "AA"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = T.dngD; e.currentTarget.style.color = "rgba(239,68,68,0.5)"; }}>Delete Entry</button>
+                </>
+              )}
+              {editing && (
+                <div style={{ marginTop: 4 }}>
+                  <input type="text" value={dT} onChange={e => setDT(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", borderBottom: `1px solid ${T.bdH}`, color: T.t1, fontSize: 24, fontWeight: 600, fontFamily: T.sans, padding: "10px 0", marginBottom: 28, lineHeight: 1.35 }} />
+                  <div style={{ marginBottom: 0 }}>
+                    <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: T.t3, marginBottom: 10 }}>Quote</div>
+                    <div style={{ borderLeft: `2px solid ${ps(dP).accent}30`, paddingLeft: 20 }}>
+                      <textarea value={dC} onChange={e => setDC(e.target.value)} rows={8} style={{ width: "100%", background: T.s2, border: `1px solid ${T.bdH}`, borderRadius: T.r, color: T.t1, fontSize: 16, fontFamily: T.serif, padding: "18px 20px", lineHeight: 1.75, boxSizing: "border-box" }} />
+                    </div>
+                  </div>
+                  <div style={{ height: 1, background: T.bd, margin: "32px 0" }} />
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontFamily: T.mono, fontWeight: 600, letterSpacing: 4, textTransform: "uppercase", color: "rgba(234,235,240,0.55)", marginBottom: 10 }}>Notes</div>
+                    <textarea value={dN} onChange={e => setDN(e.target.value)} rows={4} placeholder="Your interpretation, how this applies to you, or why this matters."
+                      style={{ width: "100%", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, color: "rgba(234,235,240,0.72)", fontSize: 15, fontFamily: T.serif, padding: "16px 20px", lineHeight: 1.85, boxSizing: "border-box" }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ height: 80 }} />
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && <div style={{ position: "fixed", bottom: FOOTER_H + 20, left: "50%", transform: "translateX(-50%)", background: T.s2, border: `1px solid ${T.bdH}`, borderRadius: T.r, padding: "12px 24px", fontSize: 13, fontFamily: T.mono, fontWeight: 500, color: T.t1, boxShadow: "0 8px 30px rgba(0,0,0,0.4)", zIndex: 200, animation: "fadeIn 0.25s ease" }}>{toast}</div>}
+    </div>
+  );
+}
+
+// ─── Mount ──
+ReactDOM.createRoot(document.getElementById("root")).render(<Praxis />);
+  </script>
+</body>
+</html>
