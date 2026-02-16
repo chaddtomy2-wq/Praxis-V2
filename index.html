@@ -27,7 +27,7 @@
   <script type="text/babel">
 // ─── Version Constants ────────────────────────────────────
 const APP_NAME = "Praxis";
-const APP_VERSION = "V3";
+const APP_VERSION = "V4";
 const BUILD_DATE = "2026-02-16";
 const SCHEMA_VERSION = 1;
 
@@ -308,6 +308,7 @@ function Praxis() {
   const [authLoading, setAuthLoading] = useState(true);
   const authStreakDone = useRef(false);
   const localStreakDone = useRef(false);
+  const anchorDone = useRef(false);
 
   // Review
   const [revPillars, setRevPillars] = useState([]);
@@ -327,12 +328,12 @@ function Praxis() {
   useEffect(() => { if (editing) { const h = e => { if (e.key === "Escape") cancelEdit(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); } }, [editing]);
   useEffect(() => { if (!pillarDD) return; const h = () => setPillarDD(false); window.addEventListener("click", h); return () => window.removeEventListener("click", h); }, [pillarDD]);
 
-  // Build anchor deck — persist daily anchor in Firestore via transaction
+  // Build anchor deck - persist daily anchor in Firestore via transaction
   useEffect(() => {
-    if (entries.length === 0 || !user) { setAnchorQueue([]); return; }
-    const today = todayStr();
-    if (anchorDate === today && anchorQueue.length > 0) return;
+    if (entries.length === 0 || !user || anchorDone.current) return;
+    anchorDone.current = true;
 
+    const today = todayStr();
     (async () => {
       const ref = fbDb.collection("users").doc(user.uid);
       let dailyId = null;
@@ -342,11 +343,9 @@ function Praxis() {
           if (snap.exists) {
             const data = snap.data();
             if (data.anchorDate === today && data.anchorId != null) {
-              // Already have today's anchor saved — use it, no write needed
               return data.anchorId;
             }
           }
-          // Pick a new random anchor for today and save it
           const newId = entries[Math.floor(Math.random() * entries.length)].id;
           tx.set(ref, { anchorDate: today, anchorId: newId }, { merge: true });
           return newId;
@@ -356,7 +355,6 @@ function Praxis() {
         dailyId = entries[Math.floor(Math.random() * entries.length)].id;
       }
 
-      // Verify the saved anchor still exists in entries
       if (!entries.find(e => String(e.id) === String(dailyId))) {
         dailyId = entries[Math.floor(Math.random() * entries.length)].id;
       }
