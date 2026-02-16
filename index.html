@@ -27,7 +27,7 @@
   <script type="text/babel">
 // ─── Version Constants ────────────────────────────────────
 const APP_NAME = "Praxis";
-const APP_VERSION = "V4";
+const APP_VERSION = "V5";
 const BUILD_DATE = "2026-02-16";
 const SCHEMA_VERSION = 1;
 
@@ -328,7 +328,7 @@ function Praxis() {
   useEffect(() => { if (editing) { const h = e => { if (e.key === "Escape") cancelEdit(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); } }, [editing]);
   useEffect(() => { if (!pillarDD) return; const h = () => setPillarDD(false); window.addEventListener("click", h); return () => window.removeEventListener("click", h); }, [pillarDD]);
 
-  // Build anchor deck - persist daily anchor in Firestore via transaction
+  // Build anchor deck - persist daily anchor in Firestore
   useEffect(() => {
     if (entries.length === 0 || !user || anchorDone.current) return;
     anchorDone.current = true;
@@ -337,28 +337,35 @@ function Praxis() {
     (async () => {
       const ref = fbDb.collection("users").doc(user.uid);
       let dailyId = null;
+      let needsWrite = false;
+
+      // Step 1: Read saved anchor from Firestore
       try {
-        dailyId = await fbDb.runTransaction(async (tx) => {
-          const snap = await tx.get(ref);
-          if (snap.exists) {
-            const data = snap.data();
-            if (data.anchorDate === today && data.anchorId != null) {
-              return data.anchorId;
+        const snap = await ref.get();
+        if (snap.exists) {
+          const data = snap.data();
+          if (data.anchorDate === today && data.anchorId != null) {
+            // Found today's saved anchor
+            const found = entries.find(e => String(e.id) === String(data.anchorId));
+            if (found) {
+              dailyId = found.id;
             }
           }
-          const newId = entries[Math.floor(Math.random() * entries.length)].id;
-          tx.set(ref, { anchorDate: today, anchorId: newId }, { merge: true });
-          return newId;
-        });
-      } catch(e) {
-        console.warn("Anchor transaction failed", e);
+        }
+      } catch(e) { console.warn("Anchor read failed", e); }
+
+      // Step 2: If no saved anchor for today, pick a new one
+      if (dailyId == null) {
         dailyId = entries[Math.floor(Math.random() * entries.length)].id;
+        needsWrite = true;
       }
 
-      if (!entries.find(e => String(e.id) === String(dailyId))) {
-        dailyId = entries[Math.floor(Math.random() * entries.length)].id;
+      // Step 3: Save to Firestore if new
+      if (needsWrite) {
+        try { await ref.set({ anchorDate: today, anchorId: String(dailyId) }, { merge: true }); } catch(e) { console.warn("Anchor write failed", e); }
       }
 
+      // Step 4: Build the queue
       const rest = shuffle(entries.filter(e => String(e.id) !== String(dailyId)).map(e => e.id));
       setAnchorQueue([dailyId, ...rest]);
       setAnchorIdx(0);
@@ -434,59 +441,55 @@ function Praxis() {
     })();
   }, [authLoading, user]);
 
-  // ─── Firestore streak (signed-in users) ──
+  // Firestore streak (signed-in users) - simple get/set, no transaction
   useEffect(() => {
     if (!user || authStreakDone.current) return;
     authStreakDone.current = true;
     (async () => {
       const today = todayStr();
       const ref = fbDb.collection("users").doc(user.uid);
+      let count = 0, lastDate = null;
+
+      // Read current streak data
       try {
-        const result = await fbDb.runTransaction(async (tx) => {
-          const snap = await tx.get(ref);
-          let count = 0, lastDate = null;
-          if (snap.exists) {
-            const data = snap.data();
-            count = data.streak || 0;
-            lastDate = data.lastOpenDate || null;
-          }
+        const snap = await ref.get();
+        if (snap.exists) {
+          const data = snap.data();
+          count = data.streak || 0;
+          lastDate = data.lastOpenDate || null;
+        }
+      } catch(e) { console.warn("Streak read failed", e); }
 
-          // Already opened today — no change needed
-          if (lastDate === today) {
-            return count; // return existing streak, no write
-          }
+      // Already opened today - just set state, no write
+      if (lastDate === today) {
+        setStreak(count);
+        return;
+      }
 
-          // Calculate new streak
-          if (lastDate === null) {
-            count = 1; // first ever open
-          } else {
-            // Check if lastDate was yesterday using date math
-            const lastParts = lastDate.split("-");
-            const lastD = new Date(parseInt(lastParts[0]), parseInt(lastParts[1]) - 1, parseInt(lastParts[2]));
-            const todayParts = today.split("-");
-            const todayD = new Date(parseInt(todayParts[0]), parseInt(todayParts[1]) - 1, parseInt(todayParts[2]));
-            const diffMs = todayD.getTime() - lastD.getTime();
-            const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+      // Calculate new streak
+      if (lastDate === null) {
+        count = 1;
+      } else {
+        const lastParts = lastDate.split("-");
+        const lastD = new Date(parseInt(lastParts[0]), parseInt(lastParts[1]) - 1, parseInt(lastParts[2]));
+        const todayParts = today.split("-");
+        const todayD = new Date(parseInt(todayParts[0]), parseInt(todayParts[1]) - 1, parseInt(todayParts[2]));
+        const diffDays = Math.round((todayD.getTime() - lastD.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) { count = count + 1; }
+        else { count = 1; }
+      }
 
-            if (diffDays === 1) {
-              count = count + 1; // consecutive day
-            } else {
-              count = 1; // streak broken
-            }
-          }
+      setStreak(count);
 
-          // Write updated streak
-          tx.set(ref, {
-            uid: user.uid, displayName: user.displayName || "", email: user.email || "", photoURL: user.photoURL || "",
-            ...(!lastDate ? { createdAt: firebase.firestore.FieldValue.serverTimestamp() } : {}),
-            lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
-            streak: count, lastOpenDate: today,
-          }, { merge: true });
-
-          return count;
-        });
-        setStreak(result);
-      } catch(e) { console.warn("Streak transaction failed", e); setStreak(1); }
+      // Write updated streak
+      try {
+        await ref.set({
+          uid: user.uid, displayName: user.displayName || "", email: user.email || "", photoURL: user.photoURL || "",
+          ...(!lastDate ? { createdAt: firebase.firestore.FieldValue.serverTimestamp() } : {}),
+          lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+          streak: count, lastOpenDate: today,
+        }, { merge: true });
+      } catch(e) { console.warn("Streak write failed", e); }
     })();
   }, [user]);
 
@@ -536,7 +539,7 @@ function Praxis() {
     }
   }
   async function handleSignOut() {
-    try { await fbAuth.signOut(); setStreak(0); authStreakDone.current = false; localStreakDone.current = false; entriesLoadedForUid.current = null; setEntries(ENTRIES.map(e => ({ ...e, notes: null }))); } catch(e) { console.error(e); }
+    try { await fbAuth.signOut(); setStreak(0); authStreakDone.current = false; localStreakDone.current = false; anchorDone.current = false; entriesLoadedForUid.current = null; setEntries(ENTRIES.map(e => ({ ...e, notes: null }))); } catch(e) { console.error(e); }
   }
 
   // ─── Export (mandatory per Master App OS) ──
