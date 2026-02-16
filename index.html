@@ -27,7 +27,7 @@
   <script type="text/babel">
 // ─── Version Constants ────────────────────────────────────
 const APP_NAME = "Praxis";
-const APP_VERSION = "V1";
+const APP_VERSION = "V2";
 const BUILD_DATE = "2026-02-15";
 const SCHEMA_VERSION = 1;
 
@@ -437,32 +437,53 @@ function Praxis() {
     authStreakDone.current = true;
     (async () => {
       const today = todayStr();
-      const yesterday = yesterdayStr();
       const ref = fbDb.collection("users").doc(user.uid);
-      let count = 0, lastDate = null;
       try {
-        const snap = await ref.get();
-        if (snap.exists) { const data = snap.data(); count = data.streak || 0; lastDate = data.lastOpenDate || null; }
-      } catch(e) { console.warn("Firestore read failed", e); }
+        const result = await fbDb.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          let count = 0, lastDate = null;
+          if (snap.exists) {
+            const data = snap.data();
+            count = data.streak || 0;
+            lastDate = data.lastOpenDate || null;
+          }
 
-      if (lastDate === null) { count = 1; }
-      else if (lastDate === today) {
-        setStreak(count);
-        try { await ref.set({ lastLoginAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch(e) {}
-        return;
-      }
-      else if (lastDate === yesterday) { count = count + 1; }
-      else { count = 1; }
+          // Already opened today — no change needed
+          if (lastDate === today) {
+            return count; // return existing streak, no write
+          }
 
-      setStreak(count);
-      try {
-        await ref.set({
-          uid: user.uid, displayName: user.displayName || "", email: user.email || "", photoURL: user.photoURL || "",
-          ...(!lastDate ? { createdAt: firebase.firestore.FieldValue.serverTimestamp() } : {}),
-          lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
-          streak: count, lastOpenDate: today,
-        }, { merge: true });
-      } catch(e) { console.warn("Firestore write failed", e); }
+          // Calculate new streak
+          if (lastDate === null) {
+            count = 1; // first ever open
+          } else {
+            // Check if lastDate was yesterday using date math
+            const lastParts = lastDate.split("-");
+            const lastD = new Date(parseInt(lastParts[0]), parseInt(lastParts[1]) - 1, parseInt(lastParts[2]));
+            const todayParts = today.split("-");
+            const todayD = new Date(parseInt(todayParts[0]), parseInt(todayParts[1]) - 1, parseInt(todayParts[2]));
+            const diffMs = todayD.getTime() - lastD.getTime();
+            const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 1) {
+              count = count + 1; // consecutive day
+            } else {
+              count = 1; // streak broken
+            }
+          }
+
+          // Write updated streak
+          tx.set(ref, {
+            uid: user.uid, displayName: user.displayName || "", email: user.email || "", photoURL: user.photoURL || "",
+            ...(!lastDate ? { createdAt: firebase.firestore.FieldValue.serverTimestamp() } : {}),
+            lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+            streak: count, lastOpenDate: today,
+          }, { merge: true });
+
+          return count;
+        });
+        setStreak(result);
+      } catch(e) { console.warn("Streak transaction failed", e); setStreak(1); }
     })();
   }, [user]);
 
@@ -471,13 +492,19 @@ function Praxis() {
     if (authLoading || user || localStreakDone.current) return;
     localStreakDone.current = true;
     const today = todayStr();
-    const yesterday = yesterdayStr();
     let lastDate = null, count = 0;
     try { const raw = localStorage.getItem("praxis_streak"); if (raw) { const p = JSON.parse(raw); lastDate = p.lastOpenDate || null; count = p.streak || 0; } } catch(e) {}
+    if (lastDate === today) { setStreak(count); return; }
     if (lastDate === null) { count = 1; }
-    else if (lastDate === today) { setStreak(count); return; }
-    else if (lastDate === yesterday) { count = count + 1; }
-    else { count = 1; }
+    else {
+      const lastParts = lastDate.split("-");
+      const lastD = new Date(parseInt(lastParts[0]), parseInt(lastParts[1]) - 1, parseInt(lastParts[2]));
+      const todayParts = today.split("-");
+      const todayD = new Date(parseInt(todayParts[0]), parseInt(todayParts[1]) - 1, parseInt(todayParts[2]));
+      const diffDays = Math.round((todayD.getTime() - lastD.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) { count = count + 1; }
+      else { count = 1; }
+    }
     setStreak(count);
     try { localStorage.setItem("praxis_streak", JSON.stringify({ lastOpenDate: today, streak: count })); } catch(e) {}
   }, [authLoading, user]);
