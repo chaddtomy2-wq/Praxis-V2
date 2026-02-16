@@ -27,8 +27,8 @@
   <script type="text/babel">
 // ─── Version Constants ────────────────────────────────────
 const APP_NAME = "Praxis";
-const APP_VERSION = "V2";
-const BUILD_DATE = "2026-02-15";
+const APP_VERSION = "V3";
+const BUILD_DATE = "2026-02-16";
 const SCHEMA_VERSION = 1;
 
 // ─── React globals ─────────────────────────────────────
@@ -327,7 +327,7 @@ function Praxis() {
   useEffect(() => { if (editing) { const h = e => { if (e.key === "Escape") cancelEdit(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); } }, [editing]);
   useEffect(() => { if (!pillarDD) return; const h = () => setPillarDD(false); window.addEventListener("click", h); return () => window.removeEventListener("click", h); }, [pillarDD]);
 
-  // Build anchor deck — persist daily anchor in Firestore
+  // Build anchor deck — persist daily anchor in Firestore via transaction
   useEffect(() => {
     if (entries.length === 0 || !user) { setAnchorQueue([]); return; }
     const today = todayStr();
@@ -335,31 +335,36 @@ function Praxis() {
 
     (async () => {
       const ref = fbDb.collection("users").doc(user.uid);
-      let savedAnchorId = null;
+      let dailyId = null;
       try {
-        const snap = await ref.get();
-        if (snap.exists) {
-          const data = snap.data();
-          if (data.anchorDate === today && data.anchorId != null) {
-            savedAnchorId = data.anchorId;
+        dailyId = await fbDb.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          if (snap.exists) {
+            const data = snap.data();
+            if (data.anchorDate === today && data.anchorId != null) {
+              // Already have today's anchor saved — use it, no write needed
+              return data.anchorId;
+            }
           }
-        }
-      } catch(e) { console.warn("Anchor read failed", e); }
+          // Pick a new random anchor for today and save it
+          const newId = entries[Math.floor(Math.random() * entries.length)].id;
+          tx.set(ref, { anchorDate: today, anchorId: newId }, { merge: true });
+          return newId;
+        });
+      } catch(e) {
+        console.warn("Anchor transaction failed", e);
+        dailyId = entries[Math.floor(Math.random() * entries.length)].id;
+      }
 
-      // Use saved anchor or pick a new one
-      const dailyId = savedAnchorId != null && entries.find(e => String(e.id) === String(savedAnchorId))
-        ? savedAnchorId
-        : entries[Math.floor(Math.random() * entries.length)].id;
+      // Verify the saved anchor still exists in entries
+      if (!entries.find(e => String(e.id) === String(dailyId))) {
+        dailyId = entries[Math.floor(Math.random() * entries.length)].id;
+      }
 
       const rest = shuffle(entries.filter(e => String(e.id) !== String(dailyId)).map(e => e.id));
       setAnchorQueue([dailyId, ...rest]);
       setAnchorIdx(0);
       setAnchorDate(today);
-
-      // Save to Firestore if new
-      if (savedAnchorId == null || String(savedAnchorId) !== String(dailyId)) {
-        try { await ref.set({ anchorDate: today, anchorId: dailyId }, { merge: true }); } catch(e) {}
-      }
     })();
   }, [entries.length, user]);
 
